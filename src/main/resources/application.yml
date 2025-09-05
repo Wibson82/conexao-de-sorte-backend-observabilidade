@@ -35,8 +35,9 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
-          issuer-uri: ${JWT_ISSUER:https://auth.conexaodesorte.com}
+          # Adota segredos padrão do projeto com fallback para variáveis legadas
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}}
+          issuer-uri: ${conexao-de-sorte-jwt-issuer:${JWT_ISSUER:https://auth.conexaodesorte.com}}
 
   # Redis Configuration for metrics cache
   data:
@@ -72,12 +73,13 @@ spring:
       use-key-prefix: true
 
 server:
-  port: ${conexao-de-sorte-server-port:8085}
+  port: ${conexao-de-sorte-server-port:8089}
   shutdown: graceful
   
   # SSL/TLS Configuration
   ssl:
-    enabled: ${SSL_ENABLED:false}
+    # Preferencialmente usa segredo padronizado; mantém compat com SSL_ENABLED
+    enabled: ${conexao-de-sorte-ssl-enabled:${SSL_ENABLED:false}}
 
 # ============================================================================
 # 📊 MANAGEMENT & OBSERVABILITY - CONFIGURAÇÃO ESPECÍFICA
@@ -278,7 +280,7 @@ spring:
       on-profile: prod
 
 server:
-  port: 8085
+  port: 8089
 
 logging:
   level:

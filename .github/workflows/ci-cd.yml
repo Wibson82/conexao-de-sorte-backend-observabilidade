@@ -262,14 +262,14 @@ jobs:
             --name "observability-microservice" \
             --network conexao-network \
             --restart unless-stopped \
-            -p "8085:8085" \
-            --health-cmd="curl -f http://localhost:8085/actuator/health/readiness || exit 1" \
+            -p "8089:8089" \
+            --health-cmd="curl -f http://localhost:8089/actuator/health/readiness || exit 1" \
             --health-interval=30s \
             --health-timeout=10s \
             --health-retries=5 \
             --health-start-period=60s \
             -e SPRING_PROFILES_ACTIVE="prod,azure" \
-            -e SERVER_PORT="8085" \
+            -e SERVER_PORT="8089" \
             -e TZ="America/Sao_Paulo" \
             -e AZURE_CLIENT_ID='${{ secrets.AZURE_CLIENT_ID }}' \
             -e AZURE_TENANT_ID='${{ secrets.AZURE_TENANT_ID }}' \
@@ -281,14 +281,14 @@ jobs:
             --label "traefik.http.routers.observability.rule=Host(\\`observability.conexaodesorte.com.br\\`)" \
             --label "traefik.http.routers.observability.entrypoints=websecure" \
             --label "traefik.http.routers.observability.tls.certresolver=letsencrypt" \
-            --label "traefik.http.services.observability.loadbalancer.server.port=8085" \
+            --label "traefik.http.services.observability.loadbalancer.server.port=8089" \
             "${FULL_IMAGE}"
       - name: Wait for service to be ready
         run: |
           TIMEOUT=180
           ELAPSED=0
           while [ $ELAPSED -lt $TIMEOUT ]; do
-            if docker exec observability-microservice curl -f -s http://localhost:8085/actuator/health/readiness >/dev/null 2>&1; then
+            if docker exec observability-microservice curl -f -s http://localhost:8089/actuator/health/readiness >/dev/null 2>&1; then
               echo "✅ Service is ready and healthy!"
               exit 0
             fi
