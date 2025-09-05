@@ -1,0 +1,151 @@
+# ========================================
+# 📊 OBSERVABILITY MICROSERVICE CONFIGURATION
+# Spring Boot 3.5.5 + Java 24
+# ========================================
+spring:
+  application:
+    name: observability
+    
+  profiles:
+    default: prod
+    
+  jackson:
+    time-zone: America/Sao_Paulo
+    locale: pt_BR
+    
+  main:
+    allow-bean-definition-overriding: true
+
+  # OAuth2 Resource Server - JWT validation via JWKS
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${conexao-de-sorte-jwt-jwks-uri:http://localhost:8081/.well-known/jwks.json}
+          issuer-uri: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
+
+server:
+  port: ${conexao-de-sorte-server-port:8085}
+  shutdown: graceful
+  
+  # SSL/TLS Configuration
+  ssl:
+    enabled: ${conexao-de-sorte-ssl-enabled:false}
+    key-store: ${conexao-de-sorte-ssl-keystore-path:}
+    key-store-password: ${conexao-de-sorte-ssl-keystore-password:}
+    key-store-type: PKCS12
+    
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,observability
+      base-path: /actuator
+      cors:
+        allowed-origins: "*"
+        allowed-methods: GET
+
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      probes:
+        enabled: true
+
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+  metrics:
+    distribution:
+      percentiles:
+        "[http.server.requests]": 0.5,0.95,0.99
+        
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+        step: 60s
+
+  tracing:
+    sampling:
+      probability: ${TRACING_PROBABILITY:0.1}
+
+# Logging Configuration
+logging:
+  level:
+    "[br.tec.facilitaservicos.observabilidade]": ${LOG_LEVEL:INFO}
+    root: WARN
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+
+  file:
+    name: ${LOG_FILE:logs/observability.log}
+
+# OpenAPI Documentation
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  show-actuator: false
+
+---
+# ========================================
+# 🌟 PRODUCTION PROFILE
+# ========================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+# Production Server Configuration          
+server:
+  ssl:
+    enabled: ${conexao-de-sorte-ssl-enabled:true}
+    key-store: ${conexao-de-sorte-ssl-keystore-path:}
+    key-store-password: ${conexao-de-sorte-ssl-keystore-password:}
+    key-store-type: PKCS12
+    
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+# Production Management Configuration    
+management:
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+        
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+# Production Logging      
+logging:
+  level:
+    "[br.tec.facilitaservicos.observabilidade]": INFO
+    root: WARN
+    
+  file:
+    name: /var/log/observability/application.log

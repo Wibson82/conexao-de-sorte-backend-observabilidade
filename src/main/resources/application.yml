@@ -1,50 +1,22 @@
+# ============================================================================
+# 📊 OBSERVABILITY MICROSERVICE CONFIGURATION
+# Spring Boot 3.5.5 + Java 24
+# ============================================================================
 spring:
-  jackson:
-    time-zone: America/Sao_Paulo
-    locale: pt_BR
   application:
-    name: autenticacao
+    name: observability-microservice
     
   profiles:
     default: prod
-    # Profiles são sobrescritos via SPRING_PROFILES_ACTIVE no deployment
-  
+    
+  jackson:
+    time-zone: America/Sao_Paulo
+    locale: pt_BR
+    
   main:
     allow-bean-definition-overriding: true
     
-  # Cache reativo (Redis) - Configuração crítica para autenticação
-  data:
-    redis:
-      host: ${conexao-de-sorte-redis-host:localhost}
-      port: ${conexao-de-sorte-redis-port:6379}
-      password: ${conexao-de-sorte-redis-password:}
-      database: ${conexao-de-sorte-redis-database:0}
-      timeout: 3000ms
-      connect-timeout: 10000ms
-      lettuce:
-        pool:
-          enabled: true
-          max-active: 30
-          max-idle: 15
-          min-idle: 8
-          max-wait: 5000ms
-          time-between-eviction-runs: 30s
-        cluster:
-          refresh:
-            adaptive: true
-            period: 60s
-
-  # Cache Configuration - Segurança crítica
-  cache:
-    type: redis
-    cache-names: rsa-private-key, rsa-public-key, key-id, valid-tokens, jwks
-    redis:
-      time-to-live: PT30M # TTL padrão para segurança
-      cache-null-values: false
-      key-prefix: "auth:"
-      use-key-prefix: true
-          
-  # Azure Key Vault with manual configuration
+  # Azure Key Vault (padrão simplificado)
   cloud:
     azure:
       keyvault:
@@ -54,325 +26,268 @@ spring:
       profile:
         tenant-id: ${AZURE_TENANT_ID:}
         subscription-id: ${AZURE_SUBSCRIPTION_ID:}
+      credential:
         client-id: ${AZURE_CLIENT_ID:}
-  
-  # Configtree secret management
-  config:
-    import:
-      - optional:configtree:/etc/secrets/azure/
-      - optional:configtree:/mnt/secrets/
-      - optional:file:./secrets.properties
-      
-  r2dbc:
-    url: ${conexao-de-sorte-database-r2dbc-url:r2dbc:mysql://localhost:3306/conexao_sorte_auth?useSSL=true&allowPublicKeyRetrieval=true}
-    username: ${conexao-de-sorte-database-username:}
-    password: ${conexao-de-sorte-database-password:}
-    pool:
-      initial-size: 5
-      max-size: 25
-      max-idle-time: 30m
-      max-acquire-time: 60s
-      max-create-connection-time: 30s
-      max-life-time: 60m
-      validation-query: SELECT 1
+        managed-identity-enabled: false
 
-  flyway:
-    enabled: true
-    url: ${conexao-de-sorte-database-jdbc-url:jdbc:mysql://localhost:3306/conexao_sorte_auth}
-    user: ${conexao-de-sorte-database-username:conexao_sorte}
-    password: ${conexao-de-sorte-database-password:}
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    validate-on-migrate: false
+  # OAuth2 Resource Server - JWT validation via JWKS
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://auth.conexaodesorte.com}
 
-user-service:
-  url: ${USER_SERVICE_URL:http://localhost:8082}
+  # Redis Configuration for metrics cache
+  data:
+    redis:
+      host: ${conexao-de-sorte-redis-host:localhost}
+      port: ${conexao-de-sorte-redis-port:6379}
+      password: ${conexao-de-sorte-redis-password:}
+      database: ${conexao-de-sorte-redis-database:7}  # DB 7 para observabilidade
+      timeout: 3s
+      connect-timeout: 10s
+      client-type: lettuce
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 20
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5s
+          time-between-eviction-runs: 30s
 
-# Server Configuration (aplicável a todos os perfis)
+  # Cache Configuration for metrics
+  cache:
+    type: redis
+    cache-names:
+      - metrics-cache
+      - business-metrics
+      - health-status
+      - service-status
+    redis:
+      time-to-live: 1m  # TTL curto para métricas em tempo real
+      cache-null-values: false
+      key-prefix: "observability:"
+      use-key-prefix: true
+
 server:
-  port: ${conexao-de-sorte-server-port:8081}
+  port: ${conexao-de-sorte-server-port:8085}
   shutdown: graceful
   
   # SSL/TLS Configuration
   ssl:
-    enabled: ${conexao-de-sorte-ssl-enabled:false}
-    key-store: ${conexao-de-sorte-ssl-keystore-path:}
-    key-store-password: ${conexao-de-sorte-ssl-keystore-password:}
-    key-store-type: PKCS12
-    
-  netty:
-    connection-timeout: 20s
-    h2c-max-content-length: 0B
-    
-  error:
-    include-message: never
-    include-binding-errors: never
-    include-stacktrace: never
-    include-exception: false
+    enabled: ${SSL_ENABLED:false}
 
-# Management and Health Configuration
+# ============================================================================
+# 📊 MANAGEMENT & OBSERVABILITY - CONFIGURAÇÃO ESPECÍFICA
+# ============================================================================
 management:
   endpoints:
     web:
-      exposure:
-        include: health,info,metrics,prometheus
       base-path: /actuator
-      cors:
-        allowed-origins: "*"
-        allowed-methods: GET
-        
+      exposure:
+        include: "*"  # Expor todos os endpoints para observabilidade
   endpoint:
     health:
-      show-details: when-authorized
-      show-components: when-authorized
-      probes:
-        enabled: true
-        
-  health:
-    readinessstate:
+      show-details: always
+      show-components: always
+    metrics:
       enabled: true
-    livenessstate:
+    prometheus:
       enabled: true
-      
+    info:
+      enabled: true
+    env:
+      enabled: true
+    configprops:
+      enabled: true
+    beans:
+      enabled: true
+    mappings:
+      enabled: true
+    scheduledtasks:
+      enabled: true
+    
+  # Metrics Configuration
   metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        step: 10s
+        descriptions: true
     distribution:
       percentiles:
-        "[http.server.requests]": 0.5,0.95,0.99
-            
-  prometheus:
-    metrics:
-      export:
-        enabled: true
-        step: 60s
-            
+        http.server.requests: 0.5, 0.9, 0.95, 0.99, 0.999
+        spring.data.redis.operations: 0.5, 0.9, 0.95, 0.99
+      percentiles-histogram:
+        http.server.requests: true
+        spring.data.redis.operations: true
+      maximum-expected-value:
+        http.server.requests: 5s
+      minimum-expected-value:
+        http.server.requests: 1ms
+    tags:
+      service: observability-microservice
+      environment: ${ENVIRONMENT:prod}
+      
+  # Health Configuration
+  health:
+    redis:
+      enabled: true
+    disk-space:
+      enabled: true
+    db:
+      enabled: false  # Não usa banco de dados próprio
+    
+  # Tracing Configuration
   tracing:
-    enabled: true
     sampling:
-      probability: ${TRACING_PROBABILITY:0.1}
-
-# Custom Application Properties
-app:
-  # JWT Configuration with secure secret management
-  jwt:
-    # Duracao dos tokens (em segundos)
-    access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:3600}  # 1 hora
-    refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:604800}  # 7 dias
-    
-    # Azure Key Vault keys - using secure naming
-    key-vault:
-      enabled: ${JWT_KEYVAULT_ENABLED:true}
-      private-key-name: ${JWT_PRIVATE_KEY_NAME:conexao-de-sorte-jwt-signing-key}
-      public-key-name: ${JWT_PUBLIC_KEY_NAME:conexao-de-sorte-jwt-verification-key}
-      key-id-name: ${JWT_KEY_ID_NAME:conexao-de-sorte-jwt-key-id}
-      secret-name: ${JWT_SECRET_NAME:conexao-de-sorte-jwt-secret}
+      probability: 1.0  # 100% sampling para observabilidade
       
-    # Fallback keys for development/testing (never use in production)
-    fallback:
-      private-key: ${conexao-de-sorte-jwt-privateKey:}
-      public-key: ${conexao-de-sorte-jwt-publicKey:}
-      key-id: ${conexao-de-sorte-jwt-key-id:}
-      secret: ${conexao-de-sorte-jwt-secret:}
-      
-    # Issuer e Audience
-    issuer: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
-    audience: ${JWT_AUDIENCE:conexao-de-sorte}
-    
-    # JWKS cache
-    jwks-cache-duration: ${JWT_JWKS_CACHE_DURATION:3600}  # 1 hora
-    
-    # Security settings
-    algorithm: ${JWT_ALGORITHM:RS256}
-    rotation:
-      enabled: ${JWT_ROTATION_ENABLED:true}
-      schedule: ${JWT_ROTATION_SCHEDULE:0 2 * * *}  # Daily at 2 AM
+  # Info Configuration
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
 
-  # CORS Configuration
-  cors:
-    allowed-origins: ${conexao-de-sorte-cors-allowed-origins:http://localhost:3000,https://app.conexaodesorte.com}
-    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-    allowed-headers: "*"
-    allow-credentials: ${conexao-de-sorte-cors-allow-credentials:true}
-    max-age: 3600
-
-  # Rate Limiting
-  rate-limit:
-    enabled: true
-    default-requests-per-minute: 60
-    endpoints:
-      "/auth/token":
-        requests-per-minute: 10
-        burst-capacity: 20
-      "/auth/refresh":
-        requests-per-minute: 30
-        burst-capacity: 50
-      "/auth/introspect":
-        requests-per-minute: 100
-        burst-capacity: 200
-
-  # Security Headers
-  security:
-    headers:
-      content-security-policy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'"
-      x-content-type-options: nosniff
-      x-frame-options: DENY
-      x-xss-protection: "1; mode=block"
-      strict-transport-security: "max-age=31536000; includeSubDomains"
-      
-  # Feature Flags
-  features:
-    auth-microservice: ${FEATURE_AUTH_MS:false}
-    jwks-rotation: ${FEATURE_JWKS_ROTATION:true}
-    audit-logging: ${FEATURE_AUDIT_LOGGING:true}
-    metrics-collection: ${FEATURE_METRICS:true}
-
-# Logging Configuration
+# ============================================================================
+# 🔍 LOGGING CONFIGURATION - OBSERVABILIDADE
+# ============================================================================
 logging:
   level:
-    "[br.tec.facilitaservicos.autenticacao]": ${LOG_LEVEL:INFO}
-    "[org.springframework.security]": ${SECURITY_LOG_LEVEL:WARN}
-    "[org.springframework.r2dbc]": ${R2DBC_LOG_LEVEL:WARN}
-    "[io.r2dbc.mysql]": ${MYSQL_LOG_LEVEL:WARN}
-    "[com.azure]": ${AZURE_LOG_LEVEL:WARN}
-    
+    root: INFO
+    br.tec.facilitaservicos.observability: DEBUG
+    io.micrometer: DEBUG
+    org.springframework.boot.actuator: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
-    
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %highlight(%5p) - [%15.15t] - %-40.40logger{36} : %m%n%ex"
+    file: "%d{yyyy-MM-dd HH:mm:ss} - %5p - [%t] - %logger{36} : %m%n%ex"
   file:
-    name: ${LOG_FILE:logs/autenticacao.log}
+    name: ${LOG_FILE:/var/log/observability/observability-microservice.log}
 
-# OpenAPI Documentation
-springdoc:
-  api-docs:
+# ============================================================================
+# 🔒 SECURITY CONFIGURATION
+# ============================================================================
+security:
+  jwt:
     enabled: true
-    path: /v3/api-docs
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
-    operationsSorter: method
-    tagsSorter: alpha
-  show-actuator: false
-  
-# Resilience4j Configuration
+
+# ============================================================================
+# 🚨 RESILIENCE4J CONFIGURATION
+# ============================================================================
 resilience4j:
-  ratelimiter:
-    instances:
-      auth-service:
-        limit-for-period: 10
-        limit-refresh-period: 1m
-        timeout-duration: 3s
-        
   circuitbreaker:
     instances:
-      azure-keyvault:
+      default:
         sliding-window-size: 100
         minimum-number-of-calls: 10
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
         permitted-number-of-calls-in-half-open-state: 5
+  
+  retry:
+    instances:
+      default:
+        max-attempts: 3
+        wait-duration: 1000ms
+        
+  timelimiter:
+    instances:
+      default:
+        timeout-duration: 10s
+
+# ============================================================================
+# 📊 BUSINESS METRICS CONFIGURATION - ESPECÍFICO OBSERVABILITY
+# ============================================================================
+observability:
+  metrics:
+    collection:
+      enabled: true
+      interval: 30s
+    business:
+      enabled: true
+      categories:
+        - authentication
+        - notifications
+        - results
+        - chat
+        - payments
+        - users
+    alerts:
+      enabled: true
+      thresholds:
+        error-rate: 0.05  # 5%
+        response-time: 2000  # 2s
+        cpu-usage: 80  # 80%
+        memory-usage: 85  # 85%
+        
+  health-checks:
+    external-services:
+      enabled: true
+      endpoints:
+        - name: auth-service
+          url: http://localhost:8081/actuator/health
+        - name: notifications-service
+          url: http://localhost:8082/actuator/health
+        - name: results-service
+          url: http://localhost:8083/actuator/health
+        - name: scheduler-service
+          url: http://localhost:8084/actuator/health
+        - name: user-service
+          url: http://localhost:8091/actuator/health
+        - name: chat-service
+          url: http://localhost:8079/actuator/health
+        - name: chatbot-service
+          url: http://localhost:8087/actuator/health
+        - name: crypto-service
+          url: http://localhost:8092/actuator/health
 
 ---
-# Development Profile
+# ============================================================================
+# 🏗️ PROFILE: DEVELOPMENT
+# ============================================================================
 spring:
   config:
     activate:
       on-profile: dev
-      
+
 logging:
   level:
-    "[br.tec.facilitaservicos.autenticacao]": DEBUG
-    "[org.springframework.security]": DEBUG
-    "[org.springframework.r2dbc]": DEBUG
-    
-app:
-  features:
-    auth-microservice: true
-    audit-logging: true
-    metrics-collection: true
-  rate-limit:
-    default-requests-per-minute: 100
-    endpoints:
-      "/auth/token":
-        requests-per-minute: 20
-      "/auth/refresh":
-        requests-per-minute: 50
+    root: DEBUG
+    br.tec.facilitaservicos.observability: TRACE
+  
+observability:
+  metrics:
+    collection:
+      interval: 10s  # Mais frequente em dev
 
 ---
-# Test Profile  
-spring:
-  config:
-    activate:
-      on-profile: test
-      
-  cloud:
-    azure:
-      keyvault:
-        secret:
-          enabled: false
-          
-app:
-  jwt:
-    key-vault:
-      enabled: false
-  features:
-    auth-microservice: true
-    metrics-collection: false
-  rate-limit:
-    default-requests-per-minute: 5
-    endpoints:
-      "/auth/token":
-        requests-per-minute: 2
-      "/auth/refresh":
-        requests-per-minute: 3
-      
-logging:
-  level:
-    "[br.tec.facilitaservicos.autenticacao]": DEBUG
-
----
-# Production Profile
+# ============================================================================
+# 🌟 PROFILE: PRODUCTION
+# ============================================================================
 spring:
   config:
     activate:
       on-profile: prod
-      
-  # Habilitar Key Vault em produção
-  cloud:
-    azure:
-      keyvault:
-        secret:
-          enabled: ${AZURE_KEYVAULT_ENABLED:true}
-          
-# Configurações específicas de produção (sobrescrever padrões)
+
 server:
-  ssl:
-    enabled: ${conexao-de-sorte-ssl-enabled:true}  # SSL habilitado em produção
-      
-app:
-  jwt:
-    key-vault:
-      enabled: ${JWT_KEYVAULT_ENABLED:true}
-  features:
-    auth-microservice: true
-    jwks-rotation: true
-    audit-logging: true
-    metrics-collection: true
-  rate-limit:
-    default-requests-per-minute: 30
-    endpoints:
-      "/auth/token":
-        requests-per-minute: 5
-      "/auth/refresh":
-        requests-per-minute: 15
-      
+  port: 8085
+
 logging:
   level:
-    "[br.tec.facilitaservicos.autenticacao]": INFO
-    root: WARN
-    "[org.springframework.security]": WARN
-    "[org.springframework.r2dbc]": WARN
-    "[io.r2dbc.mysql]": WARN
-    "[com.azure]": WARN
-    
-  file:
-    name: /var/log/autenticacao/application.log
+    root: INFO
+    br.tec.facilitaservicos.observability: INFO
+
+observability:
+  metrics:
+    collection:
+      interval: 60s  # Menos frequente em prod
+  alerts:
+    enabled: true
