@@ -235,40 +235,17 @@ observability:
       enabled: true
       endpoints:
         - name: auth-service
-          url: http://localhost:8081/actuator/health
+          url: http://auth-microservice:8081/actuator/health
         - name: notifications-service
-          url: http://localhost:8082/actuator/health
+          url: http://notifications-microservice:8082/actuator/health
         - name: results-service
-          url: http://localhost:8083/actuator/health
+          url: http://results-microservice:8083/actuator/health
         - name: scheduler-service
-          url: http://localhost:8084/actuator/health
-        - name: user-service
-          url: http://localhost:8091/actuator/health
+          url: http://scheduler-microservice:8084/actuator/health
         - name: chat-service
-          url: http://localhost:8079/actuator/health
-        - name: chatbot-service
-          url: http://localhost:8087/actuator/health
+          url: http://chat-microservice:8079/actuator/health
         - name: crypto-service
-          url: http://localhost:8092/actuator/health
-
----
-# ============================================================================
-# 🏗️ PROFILE: DEVELOPMENT
-# ============================================================================
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-logging:
-  level:
-    root: DEBUG
-    br.tec.facilitaservicos.observability: TRACE
-  
-observability:
-  metrics:
-    collection:
-      interval: 10s  # Mais frequente em dev
+          url: http://crypto-microservice:8088/actuator/health
 
 ---
 # ============================================================================

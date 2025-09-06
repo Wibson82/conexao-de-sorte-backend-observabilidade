@@ -25,7 +25,7 @@ spring:
           issuer-uri: ${conexao-de-sorte-jwt-issuer:https://auth.conexaodesorte.com}
 
 server:
-  port: ${conexao-de-sorte-server-port:8085}
+  port: ${conexao-de-sorte-server-port:8089}
   shutdown: graceful
   
   # SSL/TLS Configuration
@@ -116,7 +116,7 @@ spring:
 # Production Server Configuration          
 server:
   ssl:
-    enabled: ${conexao-de-sorte-ssl-enabled:true}
+    enabled: ${conexao-de-sorte-ssl-enabled:false}
     key-store: ${conexao-de-sorte-ssl-keystore-path:}
     key-store-password: ${conexao-de-sorte-ssl-keystore-password:}
     key-store-type: PKCS12
