@@ -41,9 +41,7 @@ environment:
   - JWT_KEYVAULT_ENABLED=true
   
   # SSL habilitado
-  - conexao-de-sorte-ssl-enabled=true
-  - conexao-de-sorte-ssl-keystore-path=/app/ssl/keystore.p12
-  - conexao-de-sorte-ssl-keystore-password=${SSL_KEYSTORE_PASSWORD}
+- conexao-de-sorte-ssl-enabled=false  # TLS termina no Traefik (ACME)
 ```
 
 #### 2. Corrigir Comando de Execução Java:
@@ -90,7 +88,7 @@ export AZURE_TENANT_ID="valor-do-secret"
 export JWT_KEYVAULT_ENABLED=true
 
 # SSL
-export conexao-de-sorte-ssl-enabled=true
+export conexao-de-sorte-ssl-enabled=false  # TLS termina no Traefik (ACME)
 
 # ✅ Comando seguro (sem JDWP)
 java -Xmx2g -XX:+UseG1GC \
